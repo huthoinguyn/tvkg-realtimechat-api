@@ -42,9 +42,20 @@ const deleteChat = async (req, res) => {
   }
 }
 
+const getChatByUserId = async (req, res) => {
+  try {
+    const { id } = req.params
+    const data = await chatService.getChatByUserId(Number(id))
+    res.status(StatusCodes.OK).json({ message: 'Get Chat Successfully', data: [...data] })
+  } catch (error) {
+    throw error
+  }
+}
+
 export const chatController = {
   getAllChat,
   createNew,
   findChatById,
-  deleteChat
+  deleteChat,
+  getChatByUserId
 }

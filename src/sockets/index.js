@@ -1,61 +1,97 @@
 import { Server } from 'socket.io'
 import axios from 'axios'
-import { API_ROOT } from '~/utils/constants'
+
+import { env } from '~/config/environment'
 
 export const initSocket = (server) => {
   const io = new Server(server, {
     cors: {
-      origin: ['http://localhost:3000', 'http://192.168.110.187:3000']
+      origin: ['http://localhost:3000', 'http://192.168.110.187:3000', env.CLIENT_ORIGIN]
     }
   })
 
+  let activeUsers = []
   io.use((socket, next) => {
     const email = socket.handshake.auth.email
     if (!email) {
       return next(new Error('invalid email'))
     }
-    socket.user_id = socket.handshake.auth.user_id
+    socket.user_id = socket.handshake.auth.id
     socket.email = email
-    socket.username = socket.handshake.auth.username
-    socket.avatar = socket.handshake.auth.avatar
+    socket.name = socket.handshake.auth.name
+    socket.image = socket.handshake.auth.image
     next()
   })
 
   io.on('connection', async (socket, next) => {
     console.log('a user connected', socket.handshake.auth)
 
-    const getUsers = await axios.get(`${API_ROOT}/v1/chats`)
-    console.log(getUsers.data.data)
+    const room = `room-${socket.user_id}`
+    socket.join(room)
 
-    // Lấy danh sách người dùng đã đăng nhập
-    const users = []
-    for (let [id, socket] of io.of('/').sockets) {
-      users.push({
-        id,
-        user_id: socket.user_id,
-        email: socket.email,
-        username: socket.username,
-        avatar: socket.avatar
-      })
-    }
+    let chats = []
+    let users = []
 
-    // Phát sự kiện "getUsers" cho tất cả các socket đang kết nối
-    socket.emit('getUsers', users)
+    socket.on('myChats', async (id) => {
+      activeUsers = []
+      for (let [id, socket] of io.of('room').sockets) {
+        const existUser = activeUsers.find((u) => u.user_id === socket.user_id)
+        if (!existUser) {
+          activeUsers.push({
+            id,
+            user_id: socket.user_id,
+            email: socket.email,
+            name: socket.name,
+            image: socket.image
+          })
+        }
+      }
+      const { data } = await axios.get(`${env.APP_URL}/v1/chats/user/${id}`)
+      chats = data.data //Lấy ra danh sách các đoạn chat thuộc về người
+      // dùng
+
+      users = await Promise.all(
+        chats.map(async (c) => {
+          const { data } = await axios.get(`${env.API_ROOT}/api/v1/users/${c.participantIds}`)
+          const messages = await axios.get(`${env.APP_URL}/v1/messages/${c._id}`)
+          return {
+            ...c,
+            user: data.result,
+            // connected: false,
+            // id: null,
+            messages: messages.data
+          }
+        })
+      ) // Lấy ra thông tin chi tiết của đoạn chat
+
+      // Cập nhật trạng thái đang hoạt động của người dùng
+      const userList = await Promise.all(
+        users.map((u) => {
+          const us = activeUsers.find((uss) => uss?.user_id === u?.user?.id)
+          return {
+            ...u,
+            connected: !!us,
+            id: us?.id
+          }
+        })
+      )
+
+      socket.emit('getUsers', JSON.stringify(userList))
+    })
 
     socket.broadcast.emit('userConnected', {
       id: socket.id,
       user_id: socket.user_id,
       email: socket.email,
-      username: socket.username,
-      avatar: socket.avatar
+      name: socket.name,
+      image: socket.image
     })
 
     socket.on('sendMessage', ({ message, from, to }) => {
-      // Emit the received message to the recipient
-      socket.to(to).emit('recieveMessage', {
-        message,
-        from: from
-      })
+
+      // Gửi sự kiện "newMessage" tới tất cả các người dùng khác
+      const room = `room-${to}`
+      socket.to(room).emit('recieveMessage', { message, from, to })
     })
 
     socket.on('disconnect', () => {
@@ -64,15 +100,14 @@ export const initSocket = (server) => {
         id: socket.id,
         user_id: socket.user_id,
         email: socket.email,
-        avatar: socket.avatar,
-        username: socket.username
+        image: socket.image,
+        name: socket.name
       })
-      console.log('user disconnected')
-    })
-
-    socket.on('message', (msg) => {
-      console.log('message: ' + msg)
-      io.emit('message', msg)
+      activeUsers.splice(
+        activeUsers.findIndex((u) => u.id === socket.id),
+        1
+      )
+      console.log('user disconnected', socket.email)
     })
   })
 }
