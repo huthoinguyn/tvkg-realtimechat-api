@@ -5,7 +5,9 @@ import { OBJECT_ID_RULE, OBJECT_ID_RULE_MESSAGE } from '~/utils/validators'
 
 const createNew = async (req, res, next) => {
   const schema = Joi.object({
-    participantIds: Joi.array()
+    participantIds: Joi.array(),
+    name: Joi.string().required(),
+    lastMessage: Joi.string()
   })
 
   try {

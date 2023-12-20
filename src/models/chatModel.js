@@ -45,11 +45,29 @@ const deleteChat = async (id) => {
   }
 }
 
+const getChatByUserId = async (id) => {
+  console.log(
+    await GET_DB()
+      .collection(COLLECTION_NAME)
+      .find({ participantIds: { $in: [id] }, _destroy: false })
+      .toArray()
+  )
+  try {
+    return await GET_DB()
+      .collection(COLLECTION_NAME)
+      .find({ participantIds: { $in: [id] }, _destroy: false })
+      .toArray()
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+
 export const chatModel = {
   COLLECTION_NAME,
   COLLECTION_SCHEMA,
   getAllChat,
   createNew,
   findChatById,
-  deleteChat
+  deleteChat,
+  getChatByUserId
 }

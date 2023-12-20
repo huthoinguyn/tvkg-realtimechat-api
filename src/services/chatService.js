@@ -1,5 +1,6 @@
 /* eslint-disable no-useless-catch */
 
+import axios from 'axios'
 import { chatModel } from '~/models/chatModel'
 
 const createNew = async (data) => {
@@ -43,9 +44,26 @@ const deleteChat = async (id) => {
   }
 }
 
+const getChatByUserId = async (id) => {
+  try {
+    const chats = await chatModel.getChatByUserId(id)
+    const chatsWithUserDetails = await Promise.all(
+      chats.map((chat) => {
+        const users = chat.participantIds.filter((participantId) => participantId !== id)
+
+        return { ...chat, participantIds: users[0] }
+      })
+    )
+    return chatsWithUserDetails
+  } catch (error) {
+    throw error
+  }
+}
+
 export const chatService = {
   getAllChat,
   createNew,
   findChatById,
-  deleteChat
+  deleteChat,
+  getChatByUserId
 }

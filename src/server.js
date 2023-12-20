@@ -6,7 +6,7 @@ import { CONNECT_DB, DISCONNECT_DB } from '~/config/mongodb'
 import exitHook from 'async-exit-hook'
 import { APIs_V1 } from '~/routes/v1'
 import { errorHandlingMiddleware } from '~/middlewares/errorHandlingMiddleware'
-import { initSocket } from '~/sockets'
+import { initSocket } from '~/sockets/index'
 import { corsOptions } from '~/config/cors'
 import http from 'http'
 
